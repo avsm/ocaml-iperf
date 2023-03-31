@@ -2,7 +2,7 @@
   (name iperfv3_server)
   (package iperf-eio)
   (modules iperfv3_server)
-  (libraries eio iperf))
+  (libraries eio eio.unix iperf))
 
 (executable
   (name server)

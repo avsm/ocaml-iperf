@@ -1,5 +1,5 @@
 (library
  (name iperf)
  (package iperf)
- (libraries eio fmt eio_main yojson)
+ (libraries eio fmt yojson)
 )
