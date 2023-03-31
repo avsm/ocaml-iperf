@@ -34,7 +34,7 @@ jobs:
           ocaml-compiler: ocaml.5.0.0
       - run: opam install iperf-eio --with-test -v
 
- macbuild:
+  macbuild:
     runs-on: macos-latest
     steps:
       - name: Checkout code
