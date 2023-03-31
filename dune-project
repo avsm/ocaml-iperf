@@ -25,4 +25,5 @@
   (depends
    (ocaml (>= "5.0.0"))
    (iperf (= :version))
+   eio_main
    (eio (>= "0.8.0"))))
