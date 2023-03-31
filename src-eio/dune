@@ -1,0 +1,12 @@
+(library
+  (name iperfv3_server)
+  (package iperf-eio)
+  (modules iperfv3_server)
+  (libraries eio iperf))
+
+(executable
+  (name server)
+  (modules server)
+  (package iperf-eio)
+  (public_name iperfv3-server)
+  (libraries iperfv3_server eio_main))
