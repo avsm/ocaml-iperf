@@ -22,7 +22,7 @@ let set_state t flow state =
   Eio.Flow.write flow [ (IP.wire_value_of_state state) ]
 
 let wait_state t flow state =
-  traceln "Server: waiting for state message %s" (IS.to_string t.state);
+  traceln "Server: waiting for state message %s" (IS.to_string state);
   let c = Cstruct.create 1 in
   Eio.Flow.read_exact flow c;
   let s = IP.state_of_wire_value c in
