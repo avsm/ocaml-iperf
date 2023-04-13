@@ -1,0 +1,6 @@
+(executable
+  (name iperfv3_uring_server)
+  (public_name iperfv3-uring-server)
+  (package iperf-eio)
+  (modules iperfv3_uring_server)
+  (libraries iperf uring))
