@@ -5,7 +5,6 @@ open Printf
 type t = {
   flow: Unix.file_descr;
   mutable conns: Unix.file_descr list;
-  mutable cookie: string;
   mutable state: IS.t;
   mutable len: int;
   mutable parallel: int;
@@ -25,9 +24,6 @@ let sessions = Hashtbl.create 7
 
 let jid = ref 0
 let get_jid () = incr jid; !jid
-
-let is_valid_cookie cookie =
-  String.length cookie = IP.cookie_size
 
 let read_exactly fd len =
   let buf = Bytes.create len in
@@ -81,7 +77,7 @@ let write_json fd json =
   match Unix.write fd (Cstruct.to_bytes buf) 0 (Cstruct.length buf) with
   | 0 | (-1) -> failwith "write_json"
   | n when n = Cstruct.length buf -> eprintf "wrote: %S\n%!" (Cstruct.to_string buf);
-  | n -> failwith "write_json: short"
+  | _ -> failwith "write_json: short"
 
 let diff_times sw ew stms etms =
   let open Unix in
@@ -113,17 +109,17 @@ let push_one_read uring region fd =
   let chunk = Uring.Region.alloc region in
   match Uring.read_chunk uring ~file_offset:Optint.Int63.zero fd chunk id with
   | None -> failwith "push_one_read"
-  | Some j -> Hashtbl.add reqs id (`IO (id,chunk,fd))
+  | Some _job -> Hashtbl.add reqs id (`IO (id,chunk,fd))
 
-let push_control_read uring region fd =
+let push_control_read uring fd =
   let id = get_jid () in
   let buf = Cstruct.create 1 in
   match Uring.read uring ~file_offset:Optint.Int63.zero fd buf id with
   | None -> failwith "push_control_read"
-  | Some j -> Hashtbl.add reqs id (`Control buf)
+  | Some _job -> Hashtbl.add reqs id (`Control buf)
 
 let push_reads t uring region =
-  push_control_read uring region t.flow;
+  push_control_read uring t.flow;
   List.iter (fun fd -> push_one_read uring region fd) t.conns;
   let _ = Uring.submit uring in
   let wait_nonblock () = Uring.get_cqe_nonblocking uring in
@@ -132,6 +128,7 @@ let push_reads t uring region =
     match wait () with
     | None -> fn wait_block
     | Some { result; data } -> begin
+            eprintf "re %d\n%!" result;
         match Hashtbl.find_opt reqs data with
         | Some (`IO (id,chunk,fd)) ->
             push_one_read uring region fd;
@@ -170,7 +167,7 @@ let handle_client flow _addr =
   | None ->
     eprintf "Server: new iperf3 session started, cookie %S\n%!" cookie;
     let start_times = Unix.times () in
-    let t = { flow; conns=[]; state = IS.TEST_START; cookie; len=0;
+    let t = { flow; conns=[]; state = IS.TEST_START; len=0;
       parallel=0; start_times; start_wallclock=0. } in
     set_state t flow IS.PARAM_EXCHANGE;
     eprintf "Server: reading JSON parameters\n%!";
