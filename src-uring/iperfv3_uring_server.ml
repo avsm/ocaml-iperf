@@ -8,7 +8,6 @@ type t = {
   mutable cookie: string;
   mutable state: IS.t;
   mutable len: int;
-  incr_streams: unit -> unit;
   mutable parallel: int;
   mutable start_times: Unix.process_times;
   mutable start_wallclock: float;
@@ -139,7 +138,7 @@ let push_reads t uring region =
             let _ = Uring.submit uring in
             Hashtbl.remove reqs id;
             Uring.Region.free chunk; 
-            fn wait_nonblock
+            fn wait_block
         | Some (`Control buf) ->
             expect_state t buf IS.TEST_END;
             complete_tests t
@@ -148,9 +147,9 @@ let push_reads t uring region =
   in fn wait_nonblock
 
 let start_test t =
-  eprintf "Server: starting test\n%!";
-  let block_size = 4096 in
-  let slots = 64 in
+  eprintf "Server: starting test len=%d\n%!" t.len;
+  let block_size = t.len in
+  let slots = t.parallel + 1 in
   let uring = Uring.create ~queue_depth:64 () in
   let buf = Cstruct.create (block_size * slots) in
   let region = Uring.Region.init ~block_size buf.Cstruct.buffer slots in
@@ -170,14 +169,9 @@ let handle_client flow _addr =
   match Hashtbl.find_opt sessions cookie with
   | None ->
     eprintf "Server: new iperf3 session started, cookie %S\n%!" cookie;
-    let nstreams = Atomic.make 0 in
-    let incr_streams () =
-      Atomic.incr nstreams;
-    in
     let start_times = Unix.times () in
     let t = { flow; conns=[]; state = IS.TEST_START; cookie; len=0;
-      incr_streams; parallel=0; start_times;
-      start_wallclock=0. } in
+      parallel=0; start_times; start_wallclock=0. } in
     set_state t flow IS.PARAM_EXCHANGE;
     eprintf "Server: reading JSON parameters\n%!";
     let params = read_json flow in
@@ -190,7 +184,6 @@ let handle_client flow _addr =
     eprintf "Waiting for streams\n%!";
   | Some t ->
     eprintf "Server: new session on cookie %S\n%!" cookie;
-    t.incr_streams ();
     t.conns <- flow :: t.conns;
     if List.length t.conns = t.parallel then
       start_test t
